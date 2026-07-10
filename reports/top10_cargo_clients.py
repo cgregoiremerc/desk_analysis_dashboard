@@ -140,35 +140,44 @@ def render() -> None:
         "(**Cargo ID**) — select a year to see the top 10."
     )
 
-    if not st.button("🔄 Load / Refresh", key="btn_top10_clients", type="primary"):
+    if st.button("🔄 Load / Refresh", key="btn_top10_clients", type="primary"):
+        with st.spinner("Loading data from Veslink…"):
+            try:
+                df_raw = c.fetch()
+            except requests.HTTPError as e:
+                st.error(f"❌ API error ({e.response.status_code}): {e.response.text[:300]}")
+                st.session_state.pop("top10_data", None)
+                return
+            except Exception as e:
+                st.error(f"❌ Unexpected error: {e}")
+                st.session_state.pop("top10_data", None)
+                return
+
+        missing = [col for col in c.REQUIRED_COLS + EXTRA_REQUIRED_COLS if col not in df_raw.columns]
+        if missing:
+            st.error(f"❌ Missing columns in API response: {missing}")
+            st.write("Available columns:", list(df_raw.columns))
+            st.info(
+                "This report needs **Cargo ID** and **Counterparty Short Name** in addition "
+                "to the usual columns (CP Date, Qty Unit, Cargo Grades, Vessel Type). "
+                "If the current Veslink endpoint in `reports/common.py` doesn't return them, "
+                "point `URL` to a report/export that includes client data, and it will work "
+                "the same way."
+            )
+            st.session_state.pop("top10_data", None)
+            return
+
+        df_prepared = c.prepare(df_raw)
+        df_prepared = df_prepared[df_prepared["Year"] >= c.MIN_YEAR]
+        # Cache the prepared data so it survives reruns triggered by other
+        # widgets (year selector, metric radio...) — without this, st.button()
+        # reverts to False on those reruns and the whole report would disappear.
+        st.session_state["top10_data"] = df_prepared
+
+    df = st.session_state.get("top10_data")
+    if df is None:
         st.info("Click to run the report.")
         return
-
-    with st.spinner("Loading data from Veslink…"):
-        try:
-            df_raw = c.fetch()
-        except requests.HTTPError as e:
-            st.error(f"❌ API error ({e.response.status_code}): {e.response.text[:300]}")
-            return
-        except Exception as e:
-            st.error(f"❌ Unexpected error: {e}")
-            return
-
-    missing = [col for col in c.REQUIRED_COLS + EXTRA_REQUIRED_COLS if col not in df_raw.columns]
-    if missing:
-        st.error(f"❌ Missing columns in API response: {missing}")
-        st.write("Available columns:", list(df_raw.columns))
-        st.info(
-            "This report needs **Cargo ID** and **Counterparty Short Name** in addition "
-            "to the usual columns (CP Date, Qty Unit, Cargo Grades, Vessel Type). "
-            "If the current Veslink endpoint in `reports/common.py` doesn't return them, "
-            "point `URL` to a report/export that includes client data, and it will work "
-            "the same way."
-        )
-        return
-
-    df = c.prepare(df_raw)
-    df = df[df["Year"] >= c.MIN_YEAR]
 
     ranking = _build_client_ranking(df)
     if ranking.empty:
