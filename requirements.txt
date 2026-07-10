@@ -1,0 +1,6 @@
+streamlit>=1.36
+pandas
+requests
+plotly
+kaleido==0.2.1
+reportlab

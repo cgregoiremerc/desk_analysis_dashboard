@@ -1,0 +1,14 @@
+# Never commit secrets
+.streamlit/secrets.toml
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environments
+.venv/
+venv/
+
+# OS / editor cruft
+.DS_Store
+.vscode/
