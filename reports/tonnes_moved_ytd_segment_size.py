@@ -59,7 +59,7 @@ def render() -> None:
     df_full = cached["df"]
     n_dropped = cached["n_dropped"]
     if n_dropped > 0:
-        st.warning(f"⚠️ {n_dropped} row(s) skipped (missing/invalid CP Date or Qty Unit).")
+        st.warning(f"⚠️ {n_dropped} row(s) skipped (missing/invalid CP Date or CP Qty MT).")
 
     df_2026 = df_full[df_full["Year"] == YTD_YEAR]
 

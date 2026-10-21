@@ -159,7 +159,7 @@ def render() -> None:
             st.write("Available columns:", list(df_raw.columns))
             st.info(
                 "This report needs **Cargo ID** and **Counterparty Short Name** in addition "
-                "to the usual columns (CP Date, Qty Unit, Cargo Grades, Vessel Type). "
+                "to the usual columns (CP Date, CP Qty MT, Cargo Grades, Vessel Type). "
                 "If the current Veslink endpoint in `reports/common.py` doesn't return them, "
                 "point `URL` to a report/export that includes client data, and it will work "
                 "the same way."

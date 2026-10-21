@@ -16,7 +16,7 @@ from io import BytesIO
 BASE_URL = "https://api.veslink.com/v1/imos/reports/Tonnes_moved_yoy_segment_size"
 
 COL_CP_DATE     = "CP Date"
-COL_QTY         = "Qty Unit"
+COL_QTY         = "CP Qty MT"  # quantity in metric tonnes (numeric, e.g. 80000.0)
 COL_CARGO_GRADE = "Cargo Grades"
 COL_VESSEL_TYPE = "Vessel Type"
 
@@ -53,14 +53,14 @@ def prepare(df: pd.DataFrame) -> pd.DataFrame:
     df[COL_CP_DATE] = pd.to_datetime(df[COL_CP_DATE], errors="coerce")
     df["Year"] = df[COL_CP_DATE].dt.year
 
-    # "Qty Unit" comes in as text like "80,000.00 MT": we need to strip the
-    # thousands-separator commas and the unit suffix (MT, BBL, etc.) before
-    # converting it to a number.
+    # "CP Qty MT" is the CP quantity in metric tonnes (e.g. 80000.0). It should
+    # already be numeric; as a safety net we strip any thousands-separator
+    # commas / stray text before converting, in case it ever comes as text.
     qty_clean = (
         df[COL_QTY]
         .astype(str)
-        .str.replace(",", "", regex=False)              # strip commas
-        .str.extract(r"([-+]?\d*\.?\d+)", expand=False)  # keep only the number
+        .str.replace(",", "", regex=False)
+        .str.extract(r"([-+]?\d*\.?\d+)", expand=False)
     )
     df[COL_QTY] = pd.to_numeric(qty_clean, errors="coerce")
 

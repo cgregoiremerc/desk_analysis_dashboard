@@ -55,7 +55,7 @@ def render() -> None:
     df = cached["df"]
     n_dropped = cached["n_dropped"]
     if n_dropped > 0:
-        st.warning(f"⚠️ {n_dropped} row(s) skipped (missing/invalid CP Date or Qty Unit).")
+        st.warning(f"⚠️ {n_dropped} row(s) skipped (missing/invalid CP Date or CP Qty MT).")
 
     # Only keep years >= MIN_YEAR (earlier data is too sparse)
     df = df[df["Year"] >= c.MIN_YEAR]
