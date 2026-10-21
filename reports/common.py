@@ -22,7 +22,15 @@ COL_VESSEL_TYPE = "Vessel Type"
 
 REQUIRED_COLS = [COL_CP_DATE, COL_QTY, COL_CARGO_GRADE, COL_VESSEL_TYPE]
 
-MIN_YEAR = 2017  # ignore earlier data (sparse / not representative)
+MIN_YEAR = 2017
+
+# Cargo Grades that are the same product under different names in IMOS.
+# Key = name as it comes from the API (after upper-casing / trimming),
+# value = name shown in the dashboard. Add new pairs here when you spot
+# other duplicates in the charts.
+GRADE_ALIASES = {
+    "CRUDE OIL": "CRUDE",
+}  # ignore earlier data (sparse / not representative)
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -64,6 +72,17 @@ def prepare(df: pd.DataFrame) -> pd.DataFrame:
     )
     df[COL_QTY] = pd.to_numeric(qty_clean, errors="coerce")
 
+    # Harmonise Cargo Grades: trim spaces, collapse double spaces, upper-case,
+    # then merge known synonyms (e.g. "CRUDE OIL" -> "CRUDE").
+    df[COL_CARGO_GRADE] = (
+        df[COL_CARGO_GRADE]
+        .astype("string")
+        .str.strip()
+        .str.replace(r"\s+", " ", regex=True)
+        .str.upper()
+        .replace(GRADE_ALIASES)
+    )
+
     df = df.dropna(subset=["Year", COL_QTY])
     df["Year"] = df["Year"].astype(int)
 
@@ -74,6 +93,23 @@ def prepare(df: pd.DataFrame) -> pd.DataFrame:
         ordered=True,
     )
     return df
+
+
+def get_cached(key: str):
+    """Returns the data cached in st.session_state[key], or None.
+
+    If the cache was built by an older version of the code (e.g. before the
+    quantity column changed from "Qty Unit" to "CP Qty MT"), it no longer has
+    the expected columns: in that case it's discarded so the user simply
+    reloads, instead of the page crashing with a KeyError."""
+    cached = st.session_state.get(key)
+    if cached is None:
+        return None
+    df = cached["df"] if isinstance(cached, dict) else cached
+    if not isinstance(df, pd.DataFrame) or COL_QTY not in df.columns:
+        st.session_state.pop(key, None)
+        return None
+    return cached
 
 
 def pivot_by(df: pd.DataFrame, group_col: str, period_col: str = "Year") -> pd.DataFrame:

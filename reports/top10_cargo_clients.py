@@ -174,7 +174,7 @@ def render() -> None:
         # reverts to False on those reruns and the whole report would disappear.
         st.session_state["top10_data"] = df_prepared
 
-    df = st.session_state.get("top10_data")
+    df = c.get_cached("top10_data")
     if df is None:
         st.info("Click to run the report.")
         return

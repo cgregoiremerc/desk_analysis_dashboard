@@ -51,7 +51,7 @@ def render() -> None:
         # would disappear.
         st.session_state["ytd_data"] = {"df": df_prepared, "n_dropped": n_dropped}
 
-    cached = st.session_state.get("ytd_data")
+    cached = c.get_cached("ytd_data")
     if cached is None:
         st.info("Click to run the report.")
         return
