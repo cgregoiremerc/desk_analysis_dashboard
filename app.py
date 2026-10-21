@@ -48,6 +48,7 @@ st.markdown(
 home_page   = st.Page("views/home.py", title="Tonnes Moved by Year", icon="📦", default=True)
 ytd_page    = st.Page("views/ytd.py",  title="Tonnes Moved YTD",      icon="📆")
 top10_page  = st.Page("views/top10_clients.py", title="Top 10 Cargo Clients", icon="🏆")
+fleet_page  = st.Page("views/fleet.py", title="Fleet — Time to Redelivery", icon="🚢")
 
-nav = st.navigation({"Reports": [home_page, ytd_page, top10_page]})
+nav = st.navigation({"Reports": [home_page, ytd_page, top10_page, fleet_page]})
 nav.run()

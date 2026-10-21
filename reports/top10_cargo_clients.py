@@ -29,7 +29,7 @@ COL_COUNTERPARTY = "Counterparty Short Name"
 
 EXTRA_REQUIRED_COLS = [COL_CARGO_ID, COL_COUNTERPARTY]
 
-PODIUM_COLORS = ["#FFD700", "#C0C0C0", "#CD7F32"]  # gold, silver, bronze
+PODIUM_COLORS = [c.BRAND_RED, c.BRAND_DARK, c.BRAND_GREY]  # #1, #2, #3 (dashboard colour code)
 
 
 # ── Data prep ─────────────────────────────────────────────────────────────────
@@ -81,7 +81,7 @@ def _podium_chart(top10: pd.DataFrame, metric: str, year: int) -> go.Figure:
             ),
             text=f"{row[metric]:,.0f}",
             textposition="outside",
-            textfont=dict(size=16, color="#1F2937"),
+            textfont=dict(size=16, color=c.TEXT_COLOR),
             width=0.55,
             showlegend=False,
             hovertemplate=f"{row[COL_COUNTERPARTY]}<br>{metric}: {row[metric]:,.0f}<extra></extra>",
@@ -98,6 +98,8 @@ def _podium_chart(top10: pd.DataFrame, metric: str, year: int) -> go.Figure:
         paper_bgcolor="rgba(0,0,0,0)",
         bargap=0.3,
     )
+    fig.update_layout(title_font=dict(size=20, color=c.TEXT_COLOR), plot_bgcolor="white",
+                      paper_bgcolor="white", font=dict(color=c.MUTED_TEXT))
     return fig
 
 
@@ -111,13 +113,15 @@ def _bar_chart(top10: pd.DataFrame, metric: str, year: int) -> go.Figure:
         orientation="h",
         text=metric,
         color=metric,
-        color_continuous_scale="Sunsetdark",
+        color_continuous_scale=[[0, "#D9D9D9"], [0.5, c.BRAND_GREY], [1, c.BRAND_RED]],
     )
     fig.update_traces(
         texttemplate="%{text:,.0f}",
         textposition="outside",
         marker_line_color="white",
         marker_line_width=1,
+        textfont=dict(color=c.TEXT_COLOR),
+        cliponaxis=False,
     )
     fig.update_layout(
         title=f"Top 10 Clients — {year}",
@@ -129,6 +133,10 @@ def _bar_chart(top10: pd.DataFrame, metric: str, year: int) -> go.Figure:
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
     )
+    c.style_figure(fig, title=f"Top 10 Clients — {year}", height=460)
+    fig.update_layout(margin=dict(t=60, b=10, l=10, r=60), showlegend=False)
+    fig.update_xaxes(gridcolor=c.GRID_COLOR, showgrid=True)
+    fig.update_yaxes(showgrid=False)
     return fig
 
 
