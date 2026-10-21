@@ -342,6 +342,113 @@ def _timeline(lt: pd.DataFrame, today: pd.Timestamp) -> go.Figure:
     return fig
 
 
+# ── Time series: number of TCs on hire over time ─────────────────────────────
+HISTORY = {"Last 12 months": 12, "Last 2 years": 24, "Last 5 years": 60, "All history": None}
+FORWARD = {"None": 0, "+6 months": 6, "+12 months": 12, "+24 months": 24}
+
+
+def tc_segments(df: pd.DataFrame, statuses, exclude_tct: bool, segments: list) -> pd.DataFrame:
+    """Segment rows used for the time series (same filters as the page)."""
+    base = df.dropna(subset=["delivery", "redelivery"])
+    if statuses is not None:
+        base = base[base["status"].isin(statuses)]
+    if exclude_tct:
+        base = base[~base["is_tct"]]
+    return base[base["segment"].isin(segments)]
+
+
+def count_on_hire(seg: pd.DataFrame, dates) -> pd.DataFrame:
+    """Number of distinct vessels on hire (Delivery <= date < Redelivery) at
+    each date, by segment. Returns a DataFrame: index = date, columns = segments."""
+    dates = pd.DatetimeIndex(dates)
+    rows = []
+    for d in dates:
+        on = seg[(seg["delivery"] <= d) & (seg["redelivery"] > d)]
+        counts = on.drop_duplicates("vessel_code")["segment"].value_counts()
+        rows.append(counts.rename(d))
+    out = pd.DataFrame(rows).reindex(columns=[s for s in SEGMENT_ORDER]).fillna(0).astype(int)
+    out.index = dates
+    return out.loc[:, out.sum() > 0]
+
+
+def _ts_chart(ts: pd.DataFrame, today: pd.Timestamp) -> go.Figure:
+    fig = go.Figure()
+    # stacked areas, Dry at the bottom
+    for seg in [s for s in SEGMENT_ORDER if s in ts.columns]:
+        color = SEGMENT_COLORS[seg]
+        fig.add_trace(go.Scatter(
+            x=ts.index, y=ts[seg], name=seg, stackgroup="fleet", mode="lines",
+            line=dict(color=color, width=1.5), fillcolor=_lighten(color, 0.15),
+            hovertemplate=f"<b>{seg}</b> %{{x|%b %Y}}: %{{y}} vessels<extra></extra>",
+        ))
+    total = ts.sum(axis=1)
+    fig.add_trace(go.Scatter(
+        x=ts.index, y=total, name="Total", mode="lines",
+        line=dict(color=c.TEXT_COLOR, width=2, dash="dot"),
+        hovertemplate="<b>Total</b> %{x|%b %Y}: %{y} vessels<extra></extra>",
+    ))
+    if ts.index.max() > today:
+        fig.add_vrect(x0=today, x1=ts.index.max(), fillcolor="#F4F4F4", opacity=0.6,
+                      layer="below", line_width=0)
+        fig.add_annotation(x=today, y=1, yref="paper", xanchor="left", yanchor="top", xshift=6,
+                           text="Contracted (known redeliveries)", showarrow=False,
+                           font=dict(color=c.MUTED_TEXT, size=11))
+    fig.add_shape(type="line", x0=today, x1=today, y0=0, y1=1, yref="paper",
+                  line=dict(color=c.BRAND_RED, width=2, dash="dash"))
+    fig.add_annotation(x=today, y=1, yref="paper", xanchor="right", yanchor="top", xshift=-4,
+                       text="<b>Today</b>", showarrow=False, font=dict(color=c.BRAND_RED, size=12))
+    fig.update_yaxes(title="Number of vessels on hire", rangemode="tozero")
+    fig.update_layout(hovermode="x unified")
+    return c.style_figure(fig, title="Number of TCs on hire over time",
+                          subtitle="Distinct vessels with Delivery ≤ date < Redelivery, by segment (monthly)",
+                          height=500, legend="bottom")
+
+
+def _render_timeseries(df: pd.DataFrame, today: pd.Timestamp, statuses, exclude_tct: bool,
+                       segments: list) -> None:
+    st.divider()
+    st.markdown("#### 📈 TCs on hire over time")
+    seg = tc_segments(df, statuses, exclude_tct, segments)
+    if seg.empty:
+        st.info("No segment with both Delivery and Redelivery dates for the time series.")
+        return
+
+    h1, h2, _ = st.columns([1, 1, 2])
+    hist_lbl = h1.selectbox("History", list(HISTORY), index=1, key="fleet_ts_history")
+    fwd_lbl = h2.selectbox("Look ahead", list(FORWARD), index=2, key="fleet_ts_forward",
+                           help="Shows how the fleet runs off with the redeliveries already known.")
+    months = HISTORY[hist_lbl]
+    start = (seg["delivery"].min() if months is None else today - pd.DateOffset(months=months))
+    end = today + pd.DateOffset(months=FORWARD[fwd_lbl])
+    dates = pd.date_range(start.to_period("M").to_timestamp(), end, freq="MS")
+    dates = dates.union(pd.DatetimeIndex([today]))  # exact point for today
+    ts = count_on_hire(seg, dates)
+    if ts.empty:
+        st.info("No vessel on hire over this period.")
+        return
+
+    # Today vs 1 / 2 years ago
+    ref = count_on_hire(seg, [today, today - pd.DateOffset(years=1), today - pd.DateOffset(years=2)])
+    tot = ref.sum(axis=1).tolist()
+    m = st.columns(3)
+    m[0].metric(f"TCs on hire today", tot[0])
+    m[1].metric(f"1 year ago ({today - pd.DateOffset(years=1):%d %b %Y})", tot[1],
+                delta=tot[0] - tot[1], help="Delta = today minus 1 year ago")
+    m[2].metric(f"2 years ago ({today - pd.DateOffset(years=2):%d %b %Y})", tot[2],
+                delta=tot[0] - tot[2], help="Delta = today minus 2 years ago")
+
+    st.plotly_chart(_ts_chart(ts, today), use_container_width=True)
+
+    with st.expander("📋 Monthly figures"):
+        table = ts.copy()
+        table["Total"] = table.sum(axis=1)
+        table.index = table.index.strftime("%d %b %Y")
+        st.dataframe(table, use_container_width=True)
+        st.download_button("⬇️ Export time series (CSV)", table.to_csv().encode("utf-8"),
+                           file_name=f"tc_on_hire_timeseries_{today:%Y%m%d}.csv", mime="text/csv",
+                           key="dl_fleet_ts")
+
+
 # ── Render ────────────────────────────────────────────────────────────────────
 def render() -> None:
     st.markdown("### 🚢 Fleet — Time to Redelivery")
@@ -433,6 +540,9 @@ def render() -> None:
     left, right = st.columns([1, 2], gap="large")
     left.plotly_chart(_donut(lt), use_container_width=True)
     right.plotly_chart(_by_type(lt), use_container_width=True)
+
+    _render_timeseries(df, today, status_sel if cached.get("has_status") else None,
+                       exclude_tct and has_tct, seg_sel)
 
     with st.expander(f"🗓️ Timeline per vessel ({len(lt)})"):
         st.plotly_chart(_timeline(lt, today), use_container_width=True)

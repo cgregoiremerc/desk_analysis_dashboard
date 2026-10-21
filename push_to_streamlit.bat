@@ -25,6 +25,12 @@ if errorlevel 1 goto :error
 
 echo.
 echo [OK] Changements pousses. Streamlit Cloud redeploie l'app dans 1-2 minutes.
+set "ONLINE_URL="
+if exist "online_url.txt" set /p ONLINE_URL=<online_url.txt
+if defined ONLINE_URL (
+    echo Lien en ligne : %ONLINE_URL%
+    start "" "%ONLINE_URL%"
+)
 pause
 exit /b 0
 
